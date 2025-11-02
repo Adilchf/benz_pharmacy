@@ -4,6 +4,7 @@ class Product {
   final String description;
   final double price;
   final String imageUrl;
+  final String? category; // 👈 new field
 
   Product({
     required this.id,
@@ -11,6 +12,7 @@ class Product {
     required this.description,
     required this.price,
     required this.imageUrl,
+    this.category,
   });
 
   factory Product.fromMap(Map<String, dynamic> data, String id) {
@@ -20,6 +22,7 @@ class Product {
       description: data['description'] ?? '',
       price: (data['price'] ?? 0).toDouble(),
       imageUrl: data['imageUrl'] ?? '',
+      category: data['category'],
     );
   }
 
@@ -28,5 +31,6 @@ class Product {
         'description': description,
         'price': price,
         'imageUrl': imageUrl,
+        'category': category,
       };
 }

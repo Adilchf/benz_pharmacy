@@ -3,17 +3,42 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/product_model.dart';
 import 'product_detail_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  String _selectedCategory = "All";
+  List<String> _categories = ["All"];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    final snapshot =
+        await FirebaseFirestore.instance.collection('products').get();
+    final allCats = snapshot.docs
+        .map((d) => (d.data() as Map<String, dynamic>)['category'] ?? '')
+        .where((c) => c.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList();
+    setState(() {
+      _categories = ["All", ...allCats];
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth > 900
-        ? 4
-        : screenWidth > 600
-            ? 3
-            : 2; // responsive columns
+    final crossAxisCount =
+        screenWidth > 900 ? 4 : screenWidth > 600 ? 3 : 2;
     final aspectRatio = screenWidth > 600 ? 1.1 : 0.9;
 
     return Scaffold(
@@ -24,38 +49,107 @@ class HomePage extends StatelessWidget {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/images/benz_logo.jpg', height: 38),
+            Image.asset('assets/images/benz_logo.jpg', height: 36),
             const SizedBox(width: 8),
             const Text(
               "BENZ PHARM",
               style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: Colors.white,
-              ),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.white),
             ),
           ],
         ),
       ),
-
-      // ─────────── BODY ───────────
-      body: Column(
+      drawer: screenWidth < 800
+          ? Drawer(
+              backgroundColor: const Color(0xFF3B3B3B),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                children: _categories
+                    .map(
+                      (cat) => ListTile(
+                        title: Text(cat,
+                            style: TextStyle(
+                              color: _selectedCategory == cat
+                                  ? const Color(0xFF7AC943)
+                                  : Colors.white,
+                              fontWeight: _selectedCategory == cat
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            )),
+                        onTap: () {
+                          setState(() => _selectedCategory = cat);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+            )
+          : null,
+      body: Row(
         children: [
-          // products list
+          // ─────────── SIDEBAR ───────────
+          if (screenWidth >= 800)
+            Container(
+              width: 200,
+              color: const Color(0xFF3B3B3B),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                children: _categories
+                    .map(
+                      (cat) => ListTile(
+                        title: Text(cat,
+                            style: TextStyle(
+                              color: _selectedCategory == cat
+                                  ? const Color(0xFF7AC943)
+                                  : Colors.white,
+                              fontWeight: _selectedCategory == cat
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            )),
+                        onTap: () =>
+                            setState(() => _selectedCategory = cat),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+
+          // ─────────── PRODUCT GRID ───────────
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('products').snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('products')
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator(color: Color(0xFFEC1E79)));
+                  return const Center(
+                      child: CircularProgressIndicator(
+                          color: Color(0xFFEC1E79)));
                 }
 
-                final products = snapshot.data!.docs.map((d) => Product.fromMap(d.data() as Map<String, dynamic>, d.id)).toList();
+                final allProducts = snapshot.data!.docs
+                    .map((d) => Product.fromMap(
+                        d.data() as Map<String, dynamic>, d.id))
+                    .toList();
+
+                final products = _selectedCategory == "All"
+                    ? allProducts
+                    : allProducts
+                        .where((p) =>
+                            p.category?.toLowerCase() ==
+                            _selectedCategory.toLowerCase())
+                        .toList();
 
                 if (products.isEmpty) {
-                  return const Center(
-                    child: Text("No products available yet 😢"),
-                  );
+                  return Center(
+                      child: Text(
+                    "No products in $_selectedCategory yet",
+                    style: const TextStyle(
+                        color: Color(0xFF3B3B3B), fontSize: 16),
+                  ));
                 }
 
                 return GridView.builder(
@@ -67,15 +161,14 @@ class HomePage extends StatelessWidget {
                     childAspectRatio: aspectRatio,
                   ),
                   itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final p = products[index];
+                  itemBuilder: (context, i) {
+                    final p = products[i];
                     return GestureDetector(
                       onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProductDetailPage(product: p),
-                        ),
-                      ),
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  ProductDetailPage(product: p))),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -83,7 +176,7 @@ class HomePage extends StatelessWidget {
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black12,
-                              blurRadius: 5,
+                              blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
                           ],
@@ -92,23 +185,21 @@ class HomePage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                              borderRadius:
+                                  const BorderRadius.vertical(
+                                      top: Radius.circular(12)),
                               child: Image.network(
                                 p.imageUrl,
                                 height: 120,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  height: 120,
-                                  color: Colors.grey.shade200,
-                                  child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                                ),
                               ),
                             ),
                             Padding(
                               padding: const EdgeInsets.all(8.0),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     p.name,
